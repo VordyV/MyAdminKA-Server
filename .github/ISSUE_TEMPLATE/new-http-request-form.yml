@@ -89,6 +89,6 @@ body:
       label: Permission
       description: Is there any permission needed to execute this request
       value: "none"
-      render: :x: Unchecked
+      render: ":x: Unchecked"
     validations:
       required: false
