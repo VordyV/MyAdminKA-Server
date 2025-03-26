@@ -1,15 +1,14 @@
-name: Bug Report
-description: File a bug report.
-title: "[Bug]: "
-labels: ["bug", "triage"]
-projects: ["octo-org/1", "octo-org/44"]
+name: Add new HTTP result
+description: Suggestion to add a new HTTP request
+title: "[HTTP]: "
+labels: ["HTTP"]
+projects: ["projects/14"]
 assignees:
   - octocat
 body:
   - type: markdown
     attributes:
-      value: |
-        Thanks for taking the time to fill out this bug report!
+      value: ""
   - type: input
     id: contact
     attributes:
