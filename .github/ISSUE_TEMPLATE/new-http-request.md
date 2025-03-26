@@ -7,14 +7,34 @@ assignees: VordyV
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+### Description
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+{TEXT}
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+---
+### Request type
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+{TYPE}
+
+---
+### Request model
+
+{TYPE}
+
+---
+### A model of positive response
+
+status code **{NUMBER}**
+{TYPE}
+
+---
+### Negative response model
+
+status code **{NUMBER}**
+{TYPE}
+
+---
+### Permission
+
+:x: Unchecked
+:warning: {NAME}
