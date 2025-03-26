@@ -55,6 +55,9 @@ body:
       value: "200"
     validations:
       required: true
+  - type: markdown
+    attributes:
+      value: "---"
   - type: input
     id: response_negative
     attributes:
@@ -71,6 +74,9 @@ body:
       value: "200"
     validations:
       required: true
+  - type: markdown
+    attributes:
+      value: "---"
   - type: input
     id: permission
     attributes:
