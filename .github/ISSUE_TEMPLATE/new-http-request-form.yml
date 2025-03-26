@@ -6,9 +6,6 @@ projects: ["projects/14"]
 assignees:
   - octocat
 body:
-  - type: markdown
-    attributes:
-      value: "Thanks"
   - type: textarea
     id: description
     attributes:
@@ -16,6 +13,9 @@ body:
       description: What is the role of a request
     validations:
       required: true
+  - type: markdown
+    attributes:
+      value: "---"
   - type: dropdown
     id: request_type
     attributes:
@@ -31,6 +31,9 @@ body:
       default: 0
     validations:
       required: true
+  - type: markdown
+    attributes:
+      value: "---"
   - type: textarea
     id: request_model
     attributes:
@@ -39,6 +42,9 @@ body:
       value: "none"
     validations:
       required: true
+  - type: markdown
+    attributes:
+      value: "---"
   - type: input
     id: response_positive
     attributes:
