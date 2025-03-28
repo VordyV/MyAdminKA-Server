@@ -27,6 +27,25 @@ auth_router = APIRouter(
 	tags=__tags__
 )
 
+def _validate_name(value: str):
+	if not re.match(r"^[a-zA-Z0-9\s]+$", value):
+		raise ValueError("Name can only consist of Latin letters and numbers")
+	return value
+
+def _validate_email(value: str):
+	try:
+		emailinfo = email_validator.validate_email(value, check_deliverability=False)
+		email = emailinfo.normalized
+		return value
+	except email_validator.EmailNotValidError as e:
+		raise ValueError("Email has an obscure form")
+
+def _validate_password(value: str):
+	if not re.match(r'^[A-Za-z\d!@#$%^&*()_+=\-[\]{};:\'"|,.<>/?]+$', value):
+		raise ValueError("Password can only consist of Latin characters, numbers and special characters")
+	return value
+
+
 class RegisterItem(pydantic.BaseModel):
 	name: str = pydantic.Field(min_length=3, max_length=UserModel.name.max_length)
 	email: str
@@ -34,24 +53,15 @@ class RegisterItem(pydantic.BaseModel):
 
 	@pydantic.field_validator('name')
 	def validate_name(cls, value: str):
-		if not re.match(r"^[a-zA-Z0-9\s]+$", value):
-			raise ValueError("Name can only consist of Latin letters and numbers")
-		return value
+		return _validate_name(value)
 
 	@pydantic.field_validator('email')
 	def validate_email(cls, value: str):
-		try:
-			emailinfo = email_validator.validate_email(value, check_deliverability=False)
-			email = emailinfo.normalized
-			return value
-		except email_validator.EmailNotValidError as e:
-			raise ValueError("Email has an obscure form")
+		return _validate_email(value)
 
 	@pydantic.field_validator('password')
 	def validate_password(cls, value: str):
-		if not re.match(r'^[A-Za-z\d!@#$%^&*()_+=\-[\]{};:\'"|,.<>/?]+$', value):
-			raise ValueError("Password can only consist of Latin characters, numbers and special characters")
-		return value
+		return _validate_password(value)
 
 async def delay():
 	await asyncio.sleep(round(random.uniform(1.0, 3.0), 4))
@@ -94,13 +104,34 @@ async def login(item: LoginItem, ctx = Depends(auth.uctx)):
 		}
 	raise HTTPException(401, "Bad credentials")
 
+# ================================
+# [ /users/me ]
+
 @auth_router.get(
-	path='/userinfo',
+	path='/users/me',
 	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))]
 )
 async def user_info(ctx = Depends(auth.ctx)):
 	data = await User.read_info(ctx.uid)
 	return data
+
+# [ /users/me ]
+# ================================
+
+class UserMeChangeNameItem(pydantic.BaseModel):
+	name: str = pydantic.Field(min_length=3, max_length=UserModel.name.max_length)
+
+	@pydantic.field_validator('name')
+	def validate_name(cls, value: str):
+		return _validate_name(value)
+
+@auth_router.post(
+	path="/users/me/changename",
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))]
+)
+async def change_user_name(item: UserMeChangeNameItem, ctx = Depends(auth.ctx)):
+	await User.change_name(uid=ctx.uid, name=item.name)
+	return Response(status_code=200)
 
 class RefreshTokenItem(pydantic.BaseModel):
 	refresh_token: str
