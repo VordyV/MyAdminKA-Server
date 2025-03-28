@@ -66,10 +66,11 @@ class User:
 		return data
 
 	@staticmethod
-	def update_info(uid: int, email: str, name: str):
+	def update_info(uid: int, **fields):
 		user = UserModel.get(id=uid)
-		user.email = email
-		user.name = name
+		for field, value in fields.items():
+			if getattr(user, field, None) is None: continue
+			setattr(user, field, value)
 		user.save()
 
 	@staticmethod
