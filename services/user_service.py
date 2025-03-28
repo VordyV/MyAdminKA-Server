@@ -86,6 +86,7 @@ class User:
 
 		if await UserModel.select().where(UserModel.email == email).aio_exists():
 			raise ServiceException(f"Try a different e-mail")
+		await user.aio_save()
 
 	@staticmethod
 	def change_password(uid: int, password: str, new_password: str):
