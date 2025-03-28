@@ -64,16 +64,16 @@ class User:
 		}
 		if user.is_admin: data["is_admin"] = user.is_admin
 		return data
-	
-	@staticmethod
-	async def change_email(uid: int, email: str):
-		user = await UserModel.aio_get(id=uid)
-		if user.email == email:
-			raise ServiceException(f"You can't change your e-mail to the same e-mail")
 
-		if await UserModel.select().where(UserModel.email == email).aio_exists():
-			raise ServiceException(f"Try a different e-mail")
-		user.email = email
+	@staticmethod
+	async def change_name(uid: int, name: str):
+		user = await UserModel.aio_get(id=uid)
+		if user.name == name:
+			raise ServiceException(f"You can't change your name to the same name")
+
+		if await UserModel.select().where(UserModel.name == name).aio_exists():
+			raise ServiceException(f"Try a different name")
+		user.name = name
 		await user.aio_save()
 
 	@staticmethod
