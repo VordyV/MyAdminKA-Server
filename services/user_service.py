@@ -66,12 +66,26 @@ class User:
 		return data
 
 	@staticmethod
-	def update_info(uid: int, **fields):
-		user = UserModel.get(id=uid)
+	async def update_info(uid: int, name: str):
+		user = await UserModel.aio_get(id=uid)
+		fields = {
+			"name": name
+		}
 		for field, value in fields.items():
-			if getattr(user, field, None) is None: continue
+			v = getattr(user, field, None)
+			if v is None or value is None: continue
+			elif v == value: raise ServiceException(f"You cannot replace the value {value} of {field} with the same value.")
 			setattr(user, field, value)
-		user.save()
+		await user.aio_save()
+
+	@staticmethod
+	async def change_email(uid: int, email: str):
+		user = await UserModel.aio_get(id=uid)
+		if user.email == email:
+			raise ServiceException(f"You can't change your e-mail to the same e-mail")
+
+		if await UserModel.select().where(UserModel.email == email).aio_exists():
+			raise ServiceException(f"Try a different e-mail")
 
 	@staticmethod
 	def change_password(uid: int, password: str, new_password: str):
