@@ -64,18 +64,16 @@ class User:
 		}
 		if user.is_admin: data["is_admin"] = user.is_admin
 		return data
-
+	
 	@staticmethod
-	async def update_info(uid: int, name: str):
+	async def change_email(uid: int, email: str):
 		user = await UserModel.aio_get(id=uid)
-		fields = {
-			"name": name
-		}
-		for field, value in fields.items():
-			v = getattr(user, field, None)
-			if v is None or value is None: continue
-			elif v == value: raise ServiceException(f"You cannot replace the value {value} of {field} with the same value.")
-			setattr(user, field, value)
+		if user.email == email:
+			raise ServiceException(f"You can't change your e-mail to the same e-mail")
+
+		if await UserModel.select().where(UserModel.email == email).aio_exists():
+			raise ServiceException(f"Try a different e-mail")
+		user.email = email
 		await user.aio_save()
 
 	@staticmethod
