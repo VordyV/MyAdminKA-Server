@@ -27,6 +27,10 @@ auth_router = APIRouter(
 	tags=__tags__
 )
 
+NameField = Annotated[str, pydantic.Field(min_length=3, max_length=UserModel.name.max_length)]
+PasswordField = Annotated[str, pydantic.Field(min_length=7, max_length=UserModel.hash.max_length)]
+EmailField = Annotated[str, pydantic.Field(max_length=255)]
+
 def _validate_name(value: str):
 	if not re.match(r"^[a-zA-Z0-9\s]+$", value):
 		raise ValueError("Name can only consist of Latin letters and numbers")
@@ -47,9 +51,9 @@ def _validate_password(value: str):
 
 
 class RegisterItem(pydantic.BaseModel):
-	name: str = pydantic.Field(min_length=3, max_length=UserModel.name.max_length)
-	email: str
-	password: str = pydantic.Field(min_length=7, max_length=UserModel.hash.max_length)
+	name: NameField
+	email: EmailField
+	password: PasswordField
 
 	@pydantic.field_validator('name')
 	def validate_name(cls, value: str):
@@ -85,8 +89,8 @@ async def stress():
 	return Response(content="{\"result\": 1}", status_code=200)
 
 class LoginItem(pydantic.BaseModel):
-	name: str
-	password: str
+	name: NameField
+	password: PasswordField
 
 @auth_router.post(
 	path='/login',
@@ -115,6 +119,13 @@ async def user_info(ctx = Depends(auth.ctx)):
 	data = await User.read_info(ctx.uid)
 	return data
 
+@auth_router.delete(
+	path='/users/me',
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))]
+)
+async def user_delete(ctx = Depends(auth.ctx)):
+	await User.delete(ctx.uid)
+	return Response(status_code=200)
 # [ /users/me ]
 # ================================
 
@@ -131,6 +142,33 @@ class UserMeChangeNameItem(pydantic.BaseModel):
 )
 async def change_user_name(item: UserMeChangeNameItem, ctx = Depends(auth.ctx)):
 	await User.change_name(uid=ctx.uid, name=item.name)
+	return Response(status_code=200)
+
+class UserMeChangeEmailItem(pydantic.BaseModel):
+	email: EmailField
+
+	@pydantic.field_validator('email')
+	def validate_email(cls, value: str):
+		return _validate_email(value)
+
+@auth_router.post(
+	path="/users/me/changeemail",
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))]
+)
+async def change_user_email(item: UserMeChangeEmailItem, ctx = Depends(auth.ctx)):
+	await User.change_email(uid=ctx.uid, email=item.email)
+	return Response(status_code=200)
+
+class ChangePasswordItem(pydantic.BaseModel):
+	password: PasswordField
+	new_password: PasswordField
+
+@auth_router.post(
+	path="/users/me/changepassword",
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_CHANGE_PASSWORD_TIMES")), seconds=int(os.getenv("LIMITER_CHANGE_PASSWORD_SECONDS"))))]
+)
+async def change_user_password(item: ChangePasswordItem, ctx = Depends(auth.ctx)):
+	await User.change_password(uid=ctx.uid, password=item.password, new_password=item.new_password)
 	return Response(status_code=200)
 
 class RefreshTokenItem(pydantic.BaseModel):
@@ -154,4 +192,4 @@ async def refresh(request: Request, item: RefreshTokenItem):
 		access_token = auth.security.create_access_token(refresh_token_payload.sub)
 		return {"access_token": access_token, "token_type": "bearer"}
 	except Exception as e:
-		raise HTTPException(status_code=401, detail=str(e)) from e
+		raise HTTPException(status_code=401, detail=str(e))

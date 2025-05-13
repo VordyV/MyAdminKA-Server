@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from models import UserModel, UserChronicleModel
 from . service_exception import ServiceException
@@ -88,15 +89,24 @@ class User:
 		await user.aio_save()
 
 	@staticmethod
-	def change_password(uid: int, password: str, new_password: str):
-		user = UserModel.get(id=uid)
-		delta = user.hash_datetime_update - datetime.now()
-		if delta.days < 1 and user.hash_datetime_update != user.datetime_create:
-			raise ServiceException("С последней смены прошло менее 1 дней")
+	async def change_password(uid: int, password: str, new_password: str):
+		user = await UserModel.aio_get(id=uid)
 
 		if not Password.verify(password, user.hash):
-			raise ServiceException("Пароль неверный")
+			raise ServiceException("Yeah, but the password's wrong")
+
+
+		if user.hash_datetime_update != user.datetime_create and (datetime.now() - user.hash_datetime_update).total_seconds() < int(os.getenv("TEMP_BAN_CHANGE_PASSWORD_SECONDS")):
+			raise ServiceException("Password was recently changed, wait a while to do it again")
+
+		if password == new_password:
+			raise ServiceException("You can't change the password to the same password")
 
 		user.hash = Password.encode(new_password)
 		user.hash_datetime_update = datetime.now()
-		user.save()
+		await user.aio_save()
+
+	@staticmethod
+	async def delete(uid: int):
+		user = await UserModel.aio_get(id=uid)
+		await user.aio_delete_instance()
