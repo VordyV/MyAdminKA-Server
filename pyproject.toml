@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "myadminkadaemon"
-version = "0.0.1"
+version = "0.1.1"
 description = "MyAdminKA server application"
 authors = ["Vordy <61288579+VordyV@users.noreply.github.com>"]
 readme = "README.md"
