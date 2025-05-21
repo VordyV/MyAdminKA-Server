@@ -2,6 +2,7 @@ import traceback
 from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from routers.auth import auth_router
@@ -70,6 +71,24 @@ app = FastAPI(
 	description=__description__
 )
 app.include_router(auth_router)
+
+origins = [
+    "http://localhost",
+    "http://localhost:8000",
+]
+
+app.add_middleware(
+	CORSMiddleware,
+	allow_origins=["*"],
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
+)
+
+@app.get("/cors")
+async def main():
+	return {"message": "Hello World"}
+
 
 auth.security.handle_errors(app)
 
