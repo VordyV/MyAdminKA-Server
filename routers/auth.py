@@ -1,3 +1,4 @@
+import datetime
 import os
 import traceback
 from typing import Annotated
@@ -73,7 +74,8 @@ async def delay():
 @auth_router.post(
 	path="/register",
 	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))],
-	description="Create a new user. Returns an empty result with code 200"
+	description="Create a new user. Returns an empty result with code 200",
+	response_model=None,
 )
 async def register(item: RegisterItem, ctx = Depends(auth.uctx)):
 	#scheduler = request.app.state.scheduler
@@ -83,7 +85,9 @@ async def register(item: RegisterItem, ctx = Depends(auth.uctx)):
 
 @auth_router.get(
 	path="/stress",
-	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))]
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))],
+	description="stress",
+	response_model=dict
 )
 async def stress():
 	return Response(content="{\"result\": 1}", status_code=200)
@@ -92,9 +96,15 @@ class LoginItem(pydantic.BaseModel):
 	name: NameField
 	password: PasswordField
 
+class LoginResponse(pydantic.BaseModel):
+	access_token: str
+	refresh_token: str
+
 @auth_router.post(
 	path='/login',
-	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_LOGIN_TIMES")), seconds=int(os.getenv("LIMITER_LOGIN_SECONDS"))))]
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_LOGIN_TIMES")), seconds=int(os.getenv("LIMITER_LOGIN_SECONDS"))))],
+	description="Authorizes the client by issuing an access token and an refresh",
+	response_model=LoginResponse
 )
 async def login(item: LoginItem, ctx = Depends(auth.uctx)):
 	uuid = await User.authentication(item.name, item.password)
@@ -102,26 +112,47 @@ async def login(item: LoginItem, ctx = Depends(auth.uctx)):
 	if uuid:
 		access_token = auth.security.create_access_token(uuid)
 		refresh_token = auth.security.create_refresh_token(uuid)
-		return {
-			"access_token": access_token,
-			"refresh_token": refresh_token
-		}
+		return LoginResponse(access_token=access_token, refresh_token=refresh_token)
 	raise HTTPException(401, "Bad credentials")
 
 # ================================
 # [ /users/me ]
 
+class UserInfoResponse(pydantic.BaseModel):
+	name: str
+	email: str
+	datetime_create: datetime.date | None
+	hash_datetime_update: datetime.date | None
+
+def __get_date(value: datetime.datetime | None) -> datetime.date | None:
+	try:
+		if isinstance(value, datetime.datetime):
+			return value.date()
+		return None
+	except (AttributeError, TypeError):
+		return None
+
 @auth_router.get(
 	path='/users/me',
-	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))]
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))],
+	description="Get user information",
+	response_model=UserInfoResponse
 )
 async def user_info(ctx = Depends(auth.ctx)):
 	data = await User.read_info(ctx.uid)
-	return data
+
+	return UserInfoResponse(
+		name=data.get("name"),
+		email=data.get("email"),
+		datetime_create=__get_date(data.get("datetime_create")),
+		hash_datetime_update=__get_date(data.get("hash_datetime_update"))
+	)
 
 @auth_router.delete(
 	path='/users/me',
-	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))]
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))],
+	description="Deletes the user and their data",
+	response_model=None
 )
 async def user_delete(ctx = Depends(auth.ctx)):
 	await User.delete(ctx.uid)
@@ -138,7 +169,9 @@ class UserMeChangeNameItem(pydantic.BaseModel):
 
 @auth_router.post(
 	path="/users/me/changename",
-	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))]
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))],
+	description="Change user name",
+	response_model=None
 )
 async def change_user_name(item: UserMeChangeNameItem, ctx = Depends(auth.ctx)):
 	await User.change_name(uid=ctx.uid, name=item.name)
@@ -153,7 +186,9 @@ class UserMeChangeEmailItem(pydantic.BaseModel):
 
 @auth_router.post(
 	path="/users/me/changeemail",
-	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))]
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_GENERAL_TIMES")), seconds=int(os.getenv("LIMITER_GENERAL_SECONDS"))))],
+	description="Change user email",
+	response_model=None
 )
 async def change_user_email(item: UserMeChangeEmailItem, ctx = Depends(auth.ctx)):
 	await User.change_email(uid=ctx.uid, email=item.email)
@@ -165,7 +200,9 @@ class ChangePasswordItem(pydantic.BaseModel):
 
 @auth_router.post(
 	path="/users/me/changepassword",
-	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_CHANGE_PASSWORD_TIMES")), seconds=int(os.getenv("LIMITER_CHANGE_PASSWORD_SECONDS"))))]
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_CHANGE_PASSWORD_TIMES")), seconds=int(os.getenv("LIMITER_CHANGE_PASSWORD_SECONDS"))))],
+	description="Change user password",
+	response_model=None
 )
 async def change_user_password(item: ChangePasswordItem, ctx = Depends(auth.ctx)):
 	await User.change_password(uid=ctx.uid, password=item.password, new_password=item.new_password)
@@ -174,12 +211,17 @@ async def change_user_password(item: ChangePasswordItem, ctx = Depends(auth.ctx)
 class RefreshTokenItem(pydantic.BaseModel):
 	refresh_token: str
 
+class RefreshResponse(pydantic.BaseModel):
+	access_token: str
+	token_type: str
+
 @auth_router.post(
 	path='/refresh',
-	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_REFRESH_TIMES")), seconds=int(os.getenv("LIMITER_REFRESH_SECONDS"))))]
+	dependencies=[Depends(RateLimiter(times=int(os.getenv("LIMITER_REFRESH_TIMES")), seconds=int(os.getenv("LIMITER_REFRESH_SECONDS"))))],
+	description="Get a new access token",
+	response_model=RefreshResponse
 )
 async def refresh(request: Request, item: RefreshTokenItem):
-	"""Refresh endpoint that creates a new access token using a refresh token."""
 	try:
 		# Verify the refresh token
 		refresh_token_payload = auth.security.verify_token(token=authx.RequestToken(
@@ -190,6 +232,6 @@ async def refresh(request: Request, item: RefreshTokenItem):
 
 		# Create a new access token
 		access_token = auth.security.create_access_token(refresh_token_payload.sub)
-		return {"access_token": access_token, "token_type": "bearer"}
+		return RefreshResponse(access_token=access_token, token_type="bearer")
 	except Exception as e:
 		raise HTTPException(status_code=401, detail=str(e))
