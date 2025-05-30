@@ -48,6 +48,29 @@ class MySQLManager:
 
 class RedisManager:
 
+	class RedisClient:
+
+		def __init__(self, pool: redis.ConnectionPool):
+			self.__pool = pool
+			self.__client: redis.Redis | None = None
+
+		async def __aenter__(self):
+			self.bind()
+			return self
+
+		def bind(self):
+			self.__client = redis.Redis.from_pool(self.__pool)
+
+		async def __aexit__(self, exc_type, exc_val, exc_tb):
+			await self.close()
+
+		@property
+		def redis(self) -> redis.Redis:
+			return self.__client
+
+		async def close(self):
+			await self.__client.aclose()
+
 	def __init__(self, address: str, port: int):
 		self.__pool = redis.ConnectionPool(
 			host=address,
@@ -55,5 +78,5 @@ class RedisManager:
 			max_connections=10,
 		)
 
-	def client(self) -> redis.Redis:
-		return redis.Redis(connection_pool=self.__pool)
+	def client(self) -> RedisClient:
+		return self.RedisClient(self.__pool)
