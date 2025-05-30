@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from routers.auth import auth_router
-from dbm import DataBaseManager
+from db_connectors import MySQLManager, RedisManager
 import models
 import uvicorn
 import os
@@ -16,7 +16,6 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 import tomllib
 from services.service_exception import ServiceException
 import auth
-import redis.asyncio as redis
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
 
@@ -33,12 +32,17 @@ async def lifespan(app: FastAPI):
 	mysql_address = os.getenv('MYSQL_ADDRESS')
 	mysql_port = int(os.getenv('MYSQL_PORT'))
 
-	dbm = DataBaseManager(
+	mysql = MySQLManager(
 		name=mysql_name,
 		user=mysql_user,
 		password=mysql_password,
 		address=mysql_address,
 		port=mysql_port
+	)
+
+	redis = RedisManager(
+		address=os.getenv("REDIS_ADDRESS"),
+		port=int(os.getenv("REDIS_PORT"))
 	)
 
 	jobstores = {
@@ -47,8 +51,8 @@ async def lifespan(app: FastAPI):
 	}
 
 	try:
-		await dbm.bind(models)
-		redis_connection = redis.Redis(host=os.getenv("REDIS_ADDRESS"), port=int(os.getenv("REDIS_PORT")), db=int(os.getenv("REDIS_DB")))
+		await mysql.bind(models)
+		redis_connection = redis.client()
 		await FastAPILimiter.init(redis_connection)
 		scheduler = AsyncIOScheduler(jobstores=jobstores)
 	except Exception as error:
@@ -58,6 +62,7 @@ async def lifespan(app: FastAPI):
 		os.kill(os.getpid(), signal.SIGTERM)
 
 	app.state.scheduler = scheduler
+	app.state.redis = redis
 
 	yield
 
@@ -72,23 +77,15 @@ app = FastAPI(
 )
 app.include_router(auth_router)
 
-origins = [
-    "http://localhost",
-    "http://localhost:8000",
-]
+origins = ["*"]
 
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=["*"],
+	allow_origins=origins,
 	allow_credentials=True,
 	allow_methods=["*"],
 	allow_headers=["*"],
 )
-
-@app.get("/cors")
-async def main():
-	return {"message": "Hello World"}
-
 
 auth.security.handle_errors(app)
 

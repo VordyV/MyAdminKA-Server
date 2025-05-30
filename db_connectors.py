@@ -1,8 +1,9 @@
 #from playhouse.pool import PooledMySQLDatabase
+import redis.asyncio as redis
 import peewee_async
 import inspect
 
-class DataBaseManager:
+class MySQLManager:
 
 	def __init__(self, name: str, user: str, password: str, address: str, port: int):
 
@@ -44,3 +45,15 @@ class DataBaseManager:
 	async def close(self):
 		with self.__database.allow_sync():
 			self.__database.close()
+
+class RedisManager:
+
+	def __init__(self, address: str, port: int):
+		self.__pool = redis.ConnectionPool(
+			host=address,
+			port=port,
+			max_connections=10,
+		)
+
+	def client(self) -> redis.Redis:
+		return redis.Redis(connection_pool=self.__pool)
