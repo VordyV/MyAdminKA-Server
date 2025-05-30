@@ -50,10 +50,12 @@ async def lifespan(app: FastAPI):
 			url=f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_address}:{mysql_port}/{mysql_name}")
 	}
 
+	redis_client = redis.client()
+
 	try:
 		await mysql.bind(models)
-		redis_connection = redis.client()
-		await FastAPILimiter.init(redis_connection)
+		redis_client.bind()
+		await FastAPILimiter.init(redis_client.redis)
 		scheduler = AsyncIOScheduler(jobstores=jobstores)
 	except Exception as error:
 		print(traceback.format_exc())
@@ -67,6 +69,7 @@ async def lifespan(app: FastAPI):
 	yield
 
 	await FastAPILimiter.close()
+	await redis_client.close()
 
 app = FastAPI(
 	title="MyAdminKA API",
