@@ -50,7 +50,6 @@ def _validate_password(value: str):
 		raise ValueError("Password can only consist of Latin characters, numbers and special characters")
 	return value
 
-
 class RegisterItem(pydantic.BaseModel):
 	name: NameField
 	email: EmailField
@@ -89,7 +88,7 @@ async def register(item: RegisterItem, ctx = Depends(auth.uctx)):
 	description="stress",
 	response_model=dict
 )
-async def stress():
+async def stress(ctx = Depends(auth.ctx)):
 	return Response(content="{\"result\": 1}", status_code=200)
 
 class LoginItem(pydantic.BaseModel):
@@ -112,6 +111,17 @@ async def login(item: LoginItem, ctx = Depends(auth.uctx)):
 	if uuid:
 		access_token = auth.security.create_access_token(uuid)
 		refresh_token = auth.security.create_refresh_token(uuid)
+
+		payload = auth.security.verify_token(token=authx.RequestToken(
+			token=refresh_token,
+			location="headers",
+			type="refresh"
+		))
+
+		async with ctx.redis.client() as client:
+			section = f"refreshtoken:{payload.jti}"
+			await client.redis.set(section, payload.sub, ex=os.getenv("REFRESH_TOKEN_EXPIRES"))
+
 		return LoginResponse(access_token=access_token, refresh_token=refresh_token)
 	raise HTTPException(401, "Bad credentials")
 
@@ -213,6 +223,7 @@ class RefreshTokenItem(pydantic.BaseModel):
 
 class RefreshResponse(pydantic.BaseModel):
 	access_token: str
+	refresh_token: str
 	token_type: str
 
 @auth_router.post(
@@ -230,8 +241,30 @@ async def refresh(request: Request, item: RefreshTokenItem):
 			type="refresh"
 		))
 
-		# Create a new access token
-		access_token = auth.security.create_access_token(refresh_token_payload.sub)
-		return RefreshResponse(access_token=access_token, token_type="bearer")
+		async with request.app.state.redis.client() as client:
+
+			section = f"refreshtoken:{refresh_token_payload.jti}"
+
+			if not await client.redis.get(section):
+				raise Exception("Token has been revoked")
+
+			# Create a new access token
+			access_token = auth.security.create_access_token(refresh_token_payload.sub)
+			refresh_token = auth.security.create_refresh_token(refresh_token_payload.sub)
+
+			# get payload
+			payload = auth.security.verify_token(token=authx.RequestToken(
+				token=refresh_token,
+				location="headers",
+				type="refresh"
+			))
+
+			await client.redis.delete(section)
+
+			new_section = f"refreshtoken:{payload.jti}"
+
+			await client.redis.set(new_section, payload.sub, ex=os.getenv("REFRESH_TOKEN_EXPIRES"))
+
+		return RefreshResponse(access_token=access_token, token_type="bearer", refresh_token=refresh_token)
 	except Exception as e:
 		raise HTTPException(status_code=401, detail=str(e))
