@@ -2,6 +2,7 @@ from authx import AuthX, AuthXConfig, TokenPayload
 from fastapi import Depends, Request, Header
 from typing import Annotated
 from services.user_service import User
+from db_connectors import RedisManager
 import os
 import datetime
 
@@ -23,6 +24,7 @@ class Ctx:
         self.request = request
         self.user_agent = user_agent
         self.uid = uid
+        self.redis: RedisManager = request.app.state.redis
 
 async def ctx(request: Request, user_agent: Annotated[str | None, Header()], uid = Depends(get_current_subject)):
     return Ctx(request, user_agent, uid)
