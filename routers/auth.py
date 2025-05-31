@@ -6,6 +6,7 @@ from fastapi import APIRouter, FastAPI, Request, Response, HTTPException, Header
 from contextlib import asynccontextmanager
 from models import UserModel
 from services.user_service import User
+from services.redis_service import RefreshToken
 from fastapi_limiter.depends import RateLimiter
 import pydantic
 import email_validator
@@ -118,9 +119,7 @@ async def login(item: LoginItem, ctx = Depends(auth.uctx)):
 			type="refresh"
 		))
 
-		async with ctx.redis.client() as client:
-			section = f"refreshtoken:{payload.jti}"
-			await client.redis.set(section, payload.sub, ex=os.getenv("REFRESH_TOKEN_EXPIRES"))
+		await RefreshToken.add(payload.jti, payload.sub, int(os.getenv("REFRESH_TOKEN_EXPIRES")))
 
 		return LoginResponse(access_token=access_token, refresh_token=refresh_token)
 	raise HTTPException(401, "Bad credentials")
@@ -241,29 +240,18 @@ async def refresh(request: Request, item: RefreshTokenItem):
 			type="refresh"
 		))
 
-		async with request.app.state.redis.client() as client:
+		# Create a new access token
+		access_token = auth.security.create_access_token(refresh_token_payload.sub)
+		refresh_token = auth.security.create_refresh_token(refresh_token_payload.sub)
 
-			section = f"refreshtoken:{refresh_token_payload.jti}"
+		# get payload
+		new_refresh_token_payload = auth.security.verify_token(token=authx.RequestToken(
+			token=refresh_token,
+			location="headers",
+			type="refresh"
+		))
 
-			if not await client.redis.get(section):
-				raise Exception("Token has been revoked")
-
-			# Create a new access token
-			access_token = auth.security.create_access_token(refresh_token_payload.sub)
-			refresh_token = auth.security.create_refresh_token(refresh_token_payload.sub)
-
-			# get payload
-			payload = auth.security.verify_token(token=authx.RequestToken(
-				token=refresh_token,
-				location="headers",
-				type="refresh"
-			))
-
-			await client.redis.delete(section)
-
-			new_section = f"refreshtoken:{payload.jti}"
-
-			await client.redis.set(new_section, payload.sub, ex=os.getenv("REFRESH_TOKEN_EXPIRES"))
+		await RefreshToken.update(refresh_token_payload.jti, new_refresh_token_payload.jti, new_refresh_token_payload.sub, int(os.getenv("REFRESH_TOKEN_EXPIRES")))
 
 		return RefreshResponse(access_token=access_token, token_type="bearer", refresh_token=refresh_token)
 	except Exception as e:
