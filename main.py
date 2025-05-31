@@ -15,6 +15,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 import tomllib
 from services.service_exception import ServiceException
+from services.redis_service import RedisService
 import auth
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
@@ -63,6 +64,7 @@ async def lifespan(app: FastAPI):
 		print("Server process termination")
 		os.kill(os.getpid(), signal.SIGTERM)
 
+	RedisService.redis_manager = redis
 	app.state.scheduler = scheduler
 	app.state.redis = redis
 
