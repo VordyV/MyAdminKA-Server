@@ -1,6 +1,6 @@
 name: Add new HTTP result
 description: Suggestion to add a new HTTP request
-title: "[HTTP]: "
+title: "Add HTTP request ..."
 labels: ["HTTP"]
 projects: ["projects/14"]
 assignees:
